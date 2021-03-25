@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="shop">
+<insert id="insert" parameterType="shopDto">
+	INSERT INTO songpring_shop
+	(num, title, imagePath, genre, writer, publisher, regdate, price, content, sellCount, page, bookSize)
+	VALUES(songpring_shop_seq.NEXTVAL, #{title}, #{imagePath}, #{genre}, #{writer},
+		#{publisher}, #{regdate}, #{price}, #{content}, 0, #{page}, #{bookSize})
+</insert>
+<update id="update" parameterType="shopDto">
+	UPDATE songpring_shop
+	SET title=#{title}, imagePath=#{imagePath}, genre=#{genre}, writer=#{writer}, publisher=#{publisher},
+		regdate=#{regdate}, price=#{price}, content=#{content}, page=#{page}, bookSize=#{bookSize}
+	WHERE num=#{num}
+</update>
+<delete id="delete" parameterType="int">
+	DELETE FROM songpring_shop
+	WHERE num=#{num}
+</delete>
+<select id="getData" parameterType="int" resultType="shopDto">
+	SELECT num, title, imagePath, genre, writer, publisher, TO_CHAR(regdate , 'YYYY-MM-DD') as regdate, price, content, sellCount, page, bookSize
+	FROM songpring_shop
+	WHERE num=#{num}
+</select>
+<select id="getDataRandom" resultType="shopDto">
+	SELECT num, title, imagePath, genre, writer, publisher, TO_CHAR(regdate , 'YYYY-MM') as regdate, price, content
+	FROM (SELECT * 
+		FROM songpring_shop
+		ORDER BY dbms_random.value)
+	WHERE rownum BETWEEN 1 AND 4
+</select>
+<select id="getList" parameterType="shopDto" resultType="shopDto">
+	SELECT *
+	FROM
+		(SELECT result1.*, ROWNUM AS rnum
+		FROM
+			(SELECT num, title, imagePath, genre, writer, publisher, TO_CHAR(regdate , 'YYYY-MM') as regdate, price, content, sellCount, page, bookSize
+			FROM songpring_shop
+			<choose>
+				<when test="title != null and genre == 'all'">
+					WHERE title LIKE '%'||#{title}||'%'
+				</when>
+				<when test="title != null and genre != null">
+					WHERE title LIKE '%'||#{title}||'%'
+					AND genre=#{genre}
+				</when>
+				<when test="genre != null">
+					WHERE genre=#{genre}
+				</when>
+			</choose>
+			<choose>
+				<when test="order == 'highPrice'">
+					ORDER BY price ASC
+				</when>
+				<when test="order == 'lowPrice'">
+					ORDER BY price DESC
+				</when>
+				<when test="order == 'sellCount'">
+					ORDER BY sellCount ASC
+				</when>
+				<when test="order == 'date'">
+					ORDER BY regdate ASC
+				</when>
+				<otherwise>
+					ORDER BY num ASC
+				</otherwise>
+			</choose>
+			) result1)
+	WHERE rnum BETWEEN #{startRowNum} AND #{endRowNum}
+</select>
+<select id="getCount" parameterType="shopDto" resultType="int">
+	SELECT NVL(MAX(ROWNUM), 0)
+	FROM songpring_shop
+		<choose>
+			<when test="title != null and genre == 'all'">
+				WHERE title LIKE '%'||#{title}||'%'
+			</when>
+			<when test="title != null and genre != null">
+				WHERE title LIKE '%'||#{title}||'%'
+				AND genre=#{genre}
+			</when>
+			<when test="genre != null">
+				WHERE genre=#{genre}
+			</when>
+		</choose>
+</select>
+<update id="addSellCount" parameterType="int">
+	UPDATE songpring_shop
+	SET sellCount=sellCount+1
+	WHERE num=#{num}
+</update>
+<!-- 카트 담기 -->
+<insert id="addCart" parameterType="cartDto">
+	insert into SONGPRING_CART (cartNum, userId, gdsNum, cartStock)
+	values (SONGPRING_CART_seq.nextval, #{userId}, #{gdsNum}, #{cartStock})
+</insert>
+<!-- 카트 리스트 -->
+<select id="cartList" resultType="cartListDto" parameterType="String">
+	SELECT c.cartNum as cartNum, c.userId as userId, c.gdsNum as gdsNum, c.cartStock as cartStock, c.addDate as addDate,
+		s.num as num, s.title as gdsName, s.genre as genre, s.price as gdsPrice, s.imagePath as gdsThumbImg
+	FROM songpring_cart c,songpring_shop s
+	WHERE c.userId=#{userId} and c.gdsNum = s.num
+	ORDER BY addDate DESC
+</select>
+<!-- 카트 삭제 -->
+<delete id="deleteCart" parameterType="cartDto">
+	delete SONGPRING_CART
+	where cartNum = #{cartNum}
+	and userId = #{userId}
+</delete>
+<!-- 주문 정보 -->
+<insert id="orderInfo" parameterType="orderDto">
+	insert into SONGPRING_ORDER(orderId, userId, orderRec, userAddr1, userAddr2, userAddr3, orderPhon, amount)
+	values(#{orderId}, #{userId}, #{orderRec}, #{userAddr1}, #{userAddr2}, #{userAddr3}, #{orderPhon}, #{amount})
+</insert>
+
+<!-- 주문 상세 정보 --> 
+<insert id="orderInfo_Details" parameterType="orderDetailDto">
+	insert into SONGPRING_ORDER_DETAILS(orderDetailsNum, orderId, gdsNum, cartStock)
+	select SONGPRING_ORDER_DETAILS_seq.nextval, #{orderId}, gdsNum, cartStock
+	from SONGPRING_CART
+</insert> 
+
+<!-- 카트 비우기 -->
+<delete id="cartAllDelete" parameterType="String">
+	delete SONGPRING_CART
+	where userId = #{userId}
+</delete>
+</mapper>
